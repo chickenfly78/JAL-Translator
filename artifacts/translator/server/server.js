@@ -2,11 +2,13 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { WebSocket, WebSocketServer } from "ws";
 
 const clientDirectory = resolve(
   fileURLToPath(new URL("../client/", import.meta.url)),
 );
 const port = Number(process.env.PORT || 3000);
+const maxMessageLength = 1000;
 
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error(`Invalid PORT value: ${process.env.PORT}`);
@@ -85,8 +87,91 @@ async function handleRequest(request, response) {
 }
 
 const server = createServer(handleRequest);
+const webSocketServer = new WebSocketServer({
+  noServer: true,
+  maxPayload: 8 * 1024,
+});
 
-// A WebSocket server can be attached to this HTTP server in a later version.
+server.on("upgrade", (request, socket, head) => {
+  let pathname;
+
+  try {
+    pathname = new URL(request.url || "/", "http://localhost").pathname;
+  } catch {
+    socket.destroy();
+    return;
+  }
+
+  if (pathname !== "/ws") {
+    socket.destroy();
+    return;
+  }
+
+  webSocketServer.handleUpgrade(request, socket, head, (webSocketClient) => {
+    webSocketServer.emit("connection", webSocketClient, request);
+  });
+});
+
+function sendSocketError(client, message) {
+  if (client.readyState === WebSocket.OPEN) {
+    client.send(JSON.stringify({ type: "error", message }));
+  }
+}
+
+webSocketServer.on("connection", (client) => {
+  client.on("message", (data, isBinary) => {
+    if (isBinary) {
+      client.close(1003, "Text messages only");
+      return;
+    }
+
+    let payload;
+    try {
+      payload = JSON.parse(data.toString());
+    } catch {
+      sendSocketError(client, "Message must be valid JSON.");
+      return;
+    }
+
+    if (payload?.type !== "message" || typeof payload.text !== "string") {
+      sendSocketError(client, "Message text is required.");
+      return;
+    }
+
+    const text = payload.text.trim();
+    if (!text) return;
+
+    if (text.length > maxMessageLength) {
+      sendSocketError(
+        client,
+        `Messages must be ${maxMessageLength} characters or fewer.`,
+      );
+      return;
+    }
+
+    const message = JSON.stringify({
+      type: "message",
+      sender: "Participant",
+      text,
+      sentAt: new Date().toISOString(),
+    });
+
+    for (const recipient of webSocketServer.clients) {
+      if (recipient.readyState === WebSocket.OPEN) {
+        recipient.send(message);
+      }
+    }
+  });
+
+  client.on("error", (error) => {
+    process.stderr.write(`WebSocket client error: ${error.message}\n`);
+  });
+});
+
+webSocketServer.on("error", (error) => {
+  process.stderr.write(`WebSocket server error: ${error.message}\n`);
+});
+
 server.listen(port, "0.0.0.0", () => {
   process.stdout.write(`Translator server listening on port ${port}\n`);
 });

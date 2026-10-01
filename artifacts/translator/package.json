@@ -1,6 +1,6 @@
 {
   "name": "@workspace/translator",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,5 +10,8 @@
   },
   "engines": {
     "node": ">=20.6"
+  },
+  "dependencies": {
+    "ws": "^8.22.0"
   }
 }

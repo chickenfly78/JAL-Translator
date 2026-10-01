@@ -227,7 +227,7 @@ h1 {
   border-color: rgba(163, 70, 55, 0.2);
 }
 
-.status-card[data-state="checking"] .status-light {
+.status-card[data-state="connecting"] .status-light {
   background: #ad8b45;
 }
 
@@ -246,57 +246,145 @@ h1 {
   background: var(--line);
 }
 
-.endpoint {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
+.messages {
+  margin-top: 22px;
 }
 
-.endpoint-label {
+.messages-heading {
+  margin: 0 0 10px;
   color: var(--muted);
-  font-size: 11px;
-}
-
-.endpoint code {
-  padding: 5px 7px;
-  border-radius: 2px;
-  background: var(--paper-deep);
-  color: var(--ink);
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
 }
 
-.check-button {
-  width: 100%;
-  min-height: 42px;
-  margin-top: 20px;
-  border: 1px solid #bec9b9;
+.message-list {
+  display: flex;
+  min-height: 116px;
+  max-height: 260px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  overflow-y: auto;
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: rgba(244, 241, 233, 0.58);
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+}
+
+.empty-state {
+  margin: auto;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.message-entry {
+  max-width: 100%;
+  animation: arrive 220ms ease-out both;
+}
+
+.message-sender {
+  margin: 0 0 5px 2px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.message-bubble {
+  max-width: 100%;
+  margin: 0;
+  padding: 9px 12px;
+  border: 1px solid #d9ded2;
   border-radius: 2px;
-  background: var(--signal-soft);
-  color: #315b3e;
+  background: rgba(250, 249, 243, 0.9);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.message-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.message-input {
+  min-width: 0;
+  min-height: 42px;
+  flex: 1;
+  padding: 9px 11px;
+  border: 1px solid #cfd3c7;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.message-input::placeholder {
+  color: #84908a;
+}
+
+.message-input:focus-visible,
+.send-button:focus-visible {
+  outline: 3px solid rgba(68, 122, 85, 0.3);
+  outline-offset: 2px;
+}
+
+.message-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
+.send-button {
+  min-width: 72px;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid #386a46;
+  border-radius: 2px;
+  background: var(--signal);
+  color: #fff;
   cursor: pointer;
   font-size: 12px;
   font-weight: 700;
   transition: background-color 160ms ease, transform 160ms ease;
 }
 
-.check-button:hover:not(:disabled) {
-  background: #d9e7d9;
+.send-button:hover:not(:disabled) {
+  background: #376446;
 }
 
-.check-button:active:not(:disabled) {
+.send-button:active:not(:disabled) {
   transform: translateY(1px);
 }
 
-.check-button:focus-visible {
-  outline: 3px solid rgba(68, 122, 85, 0.3);
-  outline-offset: 3px;
+.send-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
-.check-button:disabled {
-  cursor: wait;
-  opacity: 0.7;
+.message-help {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
 }
 
 footer {
