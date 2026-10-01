@@ -1,0 +1,1 @@
+- [Gemini API model availability](gemini-model-availability.md) — verify model access with the user's key; old IDs and temporary overload can affect new accounts.

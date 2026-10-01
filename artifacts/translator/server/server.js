@@ -1,8 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocket, WebSocketServer } from "ws";
+import { translateText } from "./gemini.js";
 
 const clientDirectory = resolve(
   fileURLToPath(new URL("../client/", import.meta.url)),
@@ -112,9 +114,45 @@ server.on("upgrade", (request, socket, head) => {
   });
 });
 
-function sendSocketError(client, message) {
+function sendSocketError(client, requestId, message) {
   if (client.readyState === WebSocket.OPEN) {
-    client.send(JSON.stringify({ type: "error", message }));
+    client.send(JSON.stringify({ type: "error", requestId, message }));
+  }
+}
+
+function broadcast(message) {
+  const encoded = JSON.stringify(message);
+  for (const recipient of webSocketServer.clients) {
+    if (recipient.readyState === WebSocket.OPEN) {
+      recipient.send(encoded);
+    }
+  }
+}
+
+async function translateAndBroadcast(client, text, requestId) {
+  try {
+    const translation = await translateText(text);
+    broadcast({
+      type: "message",
+      requestId,
+      sender: "Participant",
+      originalText: text,
+      ...translation,
+      sentAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    const isUnsupportedLanguage = error?.code === "UNSUPPORTED_LANGUAGE";
+    if (!isUnsupportedLanguage) {
+      process.stderr.write("Gemini translation request failed.\n");
+    }
+
+    sendSocketError(
+      client,
+      requestId,
+      isUnsupportedLanguage
+        ? "Please enter a message in Vietnamese or Japanese."
+        : "Translation failed. Please try again.",
+    );
   }
 }
 
@@ -129,12 +167,12 @@ webSocketServer.on("connection", (client) => {
     try {
       payload = JSON.parse(data.toString());
     } catch {
-      sendSocketError(client, "Message must be valid JSON.");
+      sendSocketError(client, null, "Message must be valid JSON.");
       return;
     }
 
     if (payload?.type !== "message" || typeof payload.text !== "string") {
-      sendSocketError(client, "Message text is required.");
+      sendSocketError(client, payload?.requestId, "Message text is required.");
       return;
     }
 
@@ -144,23 +182,17 @@ webSocketServer.on("connection", (client) => {
     if (text.length > maxMessageLength) {
       sendSocketError(
         client,
+        payload.requestId,
         `Messages must be ${maxMessageLength} characters or fewer.`,
       );
       return;
     }
 
-    const message = JSON.stringify({
-      type: "message",
-      sender: "Participant",
-      text,
-      sentAt: new Date().toISOString(),
-    });
-
-    for (const recipient of webSocketServer.clients) {
-      if (recipient.readyState === WebSocket.OPEN) {
-        recipient.send(message);
-      }
-    }
+    const requestId =
+      typeof payload.requestId === "string" && payload.requestId.length <= 100
+        ? payload.requestId
+        : randomUUID();
+    void translateAndBroadcast(client, text, requestId);
   });
 
   client.on("error", (error) => {
