@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node --watch server/server.js",
     "start": "node server/server.js",
-    "build": "node --check server/server.js && node --check server/gemini.js && node --check client/app.js"
+    "build": "node --check server/server.js && node --check server/gemini.js && node --check server/translation-errors.js && node --check server/translation-flow.js && node --check client/app.js",
+    "test": "node --test server/*.test.js"
   },
   "engines": {
     "node": ">=20.6"

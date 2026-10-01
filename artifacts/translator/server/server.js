@@ -5,6 +5,7 @@ import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocket, WebSocketServer } from "ws";
 import { translateText } from "./gemini.js";
+import { createTranslationFlow } from "./translation-flow.js";
 
 const clientDirectory = resolve(
   fileURLToPath(new URL("../client/", import.meta.url)),
@@ -124,37 +125,24 @@ function broadcast(message) {
   const encoded = JSON.stringify(message);
   for (const recipient of webSocketServer.clients) {
     if (recipient.readyState === WebSocket.OPEN) {
-      recipient.send(encoded);
+      try {
+        recipient.send(encoded);
+      } catch {
+        recipient.terminate();
+      }
     }
   }
 }
 
-async function translateAndBroadcast(client, text, requestId) {
-  try {
-    const translation = await translateText(text);
-    broadcast({
-      type: "message",
-      requestId,
-      sender: "Participant",
-      originalText: text,
-      ...translation,
-      sentAt: new Date().toISOString(),
-    });
-  } catch (error) {
-    const isUnsupportedLanguage = error?.code === "UNSUPPORTED_LANGUAGE";
-    if (!isUnsupportedLanguage) {
+const translationFlow = createTranslationFlow({
+  translate: translateText,
+  broadcast,
+  onFailure({ unsupported }) {
+    if (!unsupported) {
       process.stderr.write("Gemini translation request failed.\n");
     }
-
-    sendSocketError(
-      client,
-      requestId,
-      isUnsupportedLanguage
-        ? "Please enter a message in Vietnamese or Japanese."
-        : "Translation failed. Please try again.",
-    );
-  }
-}
+  },
+});
 
 webSocketServer.on("connection", (client) => {
   client.on("message", (data, isBinary) => {
@@ -168,6 +156,26 @@ webSocketServer.on("connection", (client) => {
       payload = JSON.parse(data.toString());
     } catch {
       sendSocketError(client, null, "Message must be valid JSON.");
+      return;
+    }
+
+    if (payload?.type === "retry") {
+      const messageId =
+        typeof payload.messageId === "string" && payload.messageId.length <= 100
+          ? payload.messageId
+          : "";
+      if (!messageId || !translationFlow.retry(messageId)) {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(
+            JSON.stringify({
+              type: "translation-error",
+              messageId: messageId || null,
+              retryable: false,
+              message: "This translation is no longer available.",
+            }),
+          );
+        }
+      }
       return;
     }
 
@@ -192,7 +200,7 @@ webSocketServer.on("connection", (client) => {
       typeof payload.requestId === "string" && payload.requestId.length <= 100
         ? payload.requestId
         : randomUUID();
-    void translateAndBroadcast(client, text, requestId);
+    translationFlow.submit({ requestId, text });
   });
 
   client.on("error", (error) => {

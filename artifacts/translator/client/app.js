@@ -6,7 +6,6 @@ const emptyState = document.querySelector("#empty-state");
 const messageForm = document.querySelector("#message-form");
 const messageInput = document.querySelector("#message-input");
 const sendButton = document.querySelector("#send-button");
-const messageProcessing = document.querySelector("#message-processing");
 const messageError = document.querySelector("#message-error");
 
 const languages = {
@@ -17,13 +16,22 @@ const languages = {
 let socket = null;
 let reconnectTimer = null;
 let reconnectAttempt = 0;
-let pendingRequestId = null;
+const messagesById = new Map();
+const messagesByRequestId = new Map();
 
 function updateComposerState() {
   const connected = socket?.readyState === WebSocket.OPEN;
-  const waitingForTranslation = pendingRequestId !== null;
-  messageInput.disabled = !connected || waitingForTranslation;
-  sendButton.disabled = !connected || waitingForTranslation;
+  messageInput.disabled = !connected;
+  sendButton.disabled = !connected;
+
+  for (const record of new Set([
+    ...messagesById.values(),
+    ...messagesByRequestId.values(),
+  ])) {
+    if (record.status === "unavailable") {
+      record.retryButton.disabled = !connected;
+    }
+  }
 }
 
 function showConnection(state, label, detail) {
@@ -43,18 +51,24 @@ function clearMessageError() {
   messageError.hidden = true;
 }
 
-function appendMessage(message) {
-  const source = languages[message.sourceLanguage];
-  const target = languages[message.targetLanguage];
-  if (
-    !source ||
-    !target ||
-    typeof message.originalText !== "string" ||
-    typeof message.translatedText !== "string"
-  ) {
-    return;
+function scrollMessagesToBottom() {
+  messageList.scrollTop = messageList.scrollHeight;
+}
+
+function findMessageRecord(message) {
+  if (typeof message.messageId === "string") {
+    const record = messagesById.get(message.messageId);
+    if (record) return record;
   }
 
+  if (typeof message.requestId === "string") {
+    return messagesByRequestId.get(message.requestId) || null;
+  }
+
+  return null;
+}
+
+function createMessageRecord({ messageId, requestId, originalText }) {
   emptyState?.remove();
 
   const entry = document.createElement("article");
@@ -62,42 +76,187 @@ function appendMessage(message) {
 
   const sender = document.createElement("p");
   sender.className = "message-sender";
-  sender.textContent = `${source.flag} Participant`;
-  sender.setAttribute("aria-label", `${source.name} participant`);
+  sender.textContent = "Participant";
+  sender.setAttribute("aria-label", "Participant");
 
   const original = document.createElement("p");
   original.className = "message-original";
-  original.lang = message.sourceLanguage;
-  original.textContent = message.originalText;
+  original.textContent = originalText;
 
-  const translated = document.createElement("p");
+  const translated = document.createElement("div");
   translated.className = "message-translation";
-  translated.lang = message.targetLanguage;
+  translated.dataset.state = "translating";
+  translated.setAttribute("aria-live", "polite");
+  translated.setAttribute("aria-atomic", "true");
 
   const flag = document.createElement("span");
   flag.className = "message-language-flag";
   flag.setAttribute("aria-hidden", "true");
-  flag.textContent = target.flag;
+  flag.hidden = true;
 
   const accessibleLabel = document.createElement("span");
   accessibleLabel.className = "sr-only";
-  accessibleLabel.textContent = `${target.name} translation: `;
 
   const translatedText = document.createElement("span");
   translatedText.className = "translated-text";
-  translatedText.textContent = message.translatedText;
+  translatedText.textContent = "Translating...";
 
-  translated.append(flag, accessibleLabel, translatedText);
+  const retryButton = document.createElement("button");
+  retryButton.className = "retry-button";
+  retryButton.type = "button";
+  retryButton.textContent = "Retry";
+  retryButton.setAttribute("aria-label", "Retry translation");
+  retryButton.hidden = true;
+
+  translated.append(flag, accessibleLabel, translatedText, retryButton);
   entry.append(sender, original, translated);
   messageList.append(entry);
-  messageList.scrollTop = messageList.scrollHeight;
 
-  if (message.requestId === pendingRequestId) {
-    pendingRequestId = null;
-    messageInput.value = "";
-    messageProcessing.hidden = true;
-    clearMessageError();
-    updateComposerState();
+  const record = {
+    messageId,
+    requestId,
+    entry,
+    sender,
+    original,
+    translation: translated,
+    flag,
+    accessibleLabel,
+    translatedText,
+    retryButton,
+    status: "translating",
+  };
+
+  if (messageId) messagesById.set(messageId, record);
+  if (requestId) messagesByRequestId.set(requestId, record);
+
+  retryButton.addEventListener("click", () => {
+    retryTranslation(record);
+  });
+
+  scrollMessagesToBottom();
+  return record;
+}
+
+function upsertMessage(message) {
+  if (typeof message.originalText !== "string") return null;
+
+  let record = findMessageRecord(message);
+  if (!record) {
+    record = createMessageRecord(message);
+  } else {
+    record.original.textContent = message.originalText;
+  }
+
+  if (typeof message.requestId === "string") {
+    record.requestId = message.requestId;
+    messagesByRequestId.set(message.requestId, record);
+  }
+
+  if (typeof message.messageId === "string") {
+    record.messageId = message.messageId;
+    messagesById.set(message.messageId, record);
+    if (record.requestId && messagesByRequestId.get(record.requestId) === record) {
+      messagesByRequestId.delete(record.requestId);
+    }
+  }
+
+  if (typeof message.sender === "string") {
+    record.sender.textContent = message.sender;
+  }
+
+  if (message.translationStatus === "translating") {
+    showTranslating(record);
+  }
+
+  return record;
+}
+
+function showTranslating(record) {
+  record.status = "translating";
+  record.translation.dataset.state = "translating";
+  record.flag.hidden = true;
+  record.accessibleLabel.textContent = "";
+  record.translatedText.textContent = "Translating...";
+  record.retryButton.hidden = true;
+  record.retryButton.disabled = true;
+}
+
+function showTranslation(record, message) {
+  const source = languages[message.sourceLanguage];
+  const target = languages[message.targetLanguage];
+  if (
+    !source ||
+    !target ||
+    typeof message.translatedText !== "string" ||
+    !message.translatedText.trim()
+  ) {
+    showTranslationFailure(record, {
+      message: "Translation could not be completed.",
+      retryable: false,
+    });
+    return;
+  }
+
+  record.status = "translated";
+  record.sender.textContent = `${source.flag} Participant`;
+  record.sender.setAttribute("aria-label", `${source.name} participant`);
+  record.original.lang = message.sourceLanguage;
+  record.translation.lang = message.targetLanguage;
+  record.translation.dataset.state = "translated";
+  record.flag.hidden = false;
+  record.flag.textContent = target.flag;
+  record.accessibleLabel.textContent = `${target.name} translation: `;
+  record.translatedText.textContent = message.translatedText;
+  record.retryButton.hidden = true;
+  record.retryButton.disabled = true;
+  scrollMessagesToBottom();
+}
+
+function showTranslationFailure(record, message) {
+  record.status = message.retryable ? "unavailable" : "failed";
+  record.translation.dataset.state = message.retryable ? "unavailable" : "error";
+  record.flag.hidden = true;
+  record.accessibleLabel.textContent = "";
+  record.translatedText.textContent = message.message;
+  record.retryButton.hidden = !message.retryable;
+  record.retryButton.disabled =
+    !message.retryable || socket?.readyState !== WebSocket.OPEN;
+  scrollMessagesToBottom();
+}
+
+function retryTranslation(record) {
+  if (
+    !record.messageId ||
+    record.status !== "unavailable" ||
+    socket?.readyState !== WebSocket.OPEN
+  ) {
+    return;
+  }
+
+  clearMessageError();
+  showTranslating(record);
+  try {
+    socket.send(JSON.stringify({ type: "retry", messageId: record.messageId }));
+  } catch {
+    showTranslationFailure(record, {
+      message: "Translation temporarily unavailable",
+      retryable: true,
+    });
+    socket.close();
+  }
+}
+
+function removeMessageRecord(record) {
+  record.entry.remove();
+  if (record.messageId && messagesById.get(record.messageId) === record) {
+    messagesById.delete(record.messageId);
+  }
+  if (record.requestId && messagesByRequestId.get(record.requestId) === record) {
+    messagesByRequestId.delete(record.requestId);
+  }
+
+  if (messageList.querySelector(".message-entry") === null && emptyState) {
+    messageList.append(emptyState);
   }
 }
 
@@ -167,16 +326,35 @@ function connectWebSocket() {
     }
 
     if (payload.type === "message") {
-      appendMessage(payload);
+      upsertMessage(payload);
+      return;
+    }
+
+    if (payload.type === "translation-progress") {
+      const record = findMessageRecord(payload);
+      if (record) showTranslating(record);
+      return;
+    }
+
+    if (payload.type === "translation") {
+      const record = findMessageRecord(payload);
+      if (record) showTranslation(record, payload);
+      return;
+    }
+
+    if (payload.type === "translation-error") {
+      const record = findMessageRecord(payload);
+      if (record) {
+        showTranslationFailure(record, payload);
+      } else if (typeof payload.message === "string") {
+        showMessageError(payload.message);
+      }
       return;
     }
 
     if (payload.type === "error" && typeof payload.message === "string") {
-      if (payload.requestId && payload.requestId !== pendingRequestId) return;
-
-      pendingRequestId = null;
-      messageProcessing.hidden = true;
-      updateComposerState();
+      const record = findMessageRecord(payload);
+      if (record) removeMessageRecord(record);
       showMessageError(payload.message);
     }
   });
@@ -185,12 +363,19 @@ function connectWebSocket() {
     if (socket !== currentSocket) return;
 
     socket = null;
-    if (pendingRequestId !== null) {
-      pendingRequestId = null;
-      messageProcessing.hidden = true;
-      showMessageError(
-        "The connection was interrupted before translation finished. Please try again.",
-      );
+
+    const activeRecords = new Set([
+      ...messagesById.values(),
+      ...messagesByRequestId.values(),
+    ]);
+    for (const record of activeRecords) {
+      if (record.status !== "translating") continue;
+      showTranslationFailure(record, {
+        message: record.messageId
+          ? "Translation temporarily unavailable"
+          : "Connection interrupted before the message was confirmed.",
+        retryable: Boolean(record.messageId),
+      });
     }
 
     showConnection(
@@ -210,28 +395,21 @@ messageForm.addEventListener("submit", (event) => {
   event.preventDefault();
 
   const text = messageInput.value.trim();
-  if (
-    !text ||
-    socket?.readyState !== WebSocket.OPEN ||
-    pendingRequestId !== null
-  ) {
+  if (!text || socket?.readyState !== WebSocket.OPEN) {
     return;
   }
 
-  pendingRequestId =
+  const requestId =
     globalThis.crypto?.randomUUID?.() ||
     `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   clearMessageError();
-  messageProcessing.hidden = false;
-  messageProcessing.textContent = "Translating and sharing…";
-  updateComposerState();
+  const record = createMessageRecord({ requestId, originalText: text });
 
   try {
-    socket.send(JSON.stringify({ type: "message", requestId: pendingRequestId, text }));
+    socket.send(JSON.stringify({ type: "message", requestId, text }));
+    messageInput.value = "";
   } catch {
-    pendingRequestId = null;
-    messageProcessing.hidden = true;
-    updateComposerState();
+    removeMessageRecord(record);
     showMessageError("Your message could not be sent. Please try again.");
     socket.close();
   }
