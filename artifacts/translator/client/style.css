@@ -1,0 +1,358 @@
+:root {
+  color-scheme: light;
+  --paper: #f4f1e9;
+  --paper-deep: #e9e4d8;
+  --ink: #263b37;
+  --muted: #687873;
+  --line: #d8d8cb;
+  --signal: #447a55;
+  --signal-soft: #e5eee5;
+  --warning: #a34637;
+  --warning-soft: #f5e7e1;
+  --font: "Trebuchet MS", "Avenir Next", sans-serif;
+  --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  background: var(--paper);
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font);
+  background:
+    radial-gradient(ellipse at 88% 10%, rgba(219, 225, 204, 0.44), transparent 29rem),
+    var(--paper);
+}
+
+button {
+  font: inherit;
+}
+
+.page {
+  width: min(100% - 48px, 960px);
+  min-height: 100vh;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28px 0 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.wordmark-mark {
+  width: 19px;
+  height: 19px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: -0.08em;
+}
+
+.edition {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.64fr);
+  align-items: center;
+  gap: clamp(36px, 8vw, 104px);
+  padding: 92px 0 110px;
+}
+
+.intro {
+  animation: arrive 500ms ease-out both;
+}
+
+.kicker {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 0 0 24px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.kicker::before {
+  width: 26px;
+  height: 1px;
+  content: "";
+  background: var(--signal);
+}
+
+h1 {
+  max-width: 620px;
+  margin: 0;
+  font-size: clamp(42px, 7.1vw, 76px);
+  font-weight: 700;
+  letter-spacing: -0.075em;
+  line-height: 0.98;
+}
+
+.subtitle {
+  max-width: 440px;
+  margin: 25px 0 0;
+  color: #51645f;
+  font-size: clamp(16px, 1.8vw, 19px);
+  line-height: 1.65;
+}
+
+.notice {
+  max-width: 410px;
+  margin-top: 45px;
+  padding-top: 17px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.notice strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.status-card {
+  position: relative;
+  padding: 28px;
+  border: 1px solid #d3d7c9;
+  border-radius: 3px;
+  background: rgba(250, 249, 243, 0.68);
+  box-shadow: 0 18px 48px rgba(53, 68, 57, 0.06);
+  animation: arrive 600ms 90ms ease-out both;
+}
+
+.status-card::before {
+  position: absolute;
+  top: -1px;
+  left: 28px;
+  width: 42px;
+  height: 3px;
+  content: "";
+  background: var(--signal);
+}
+
+.card-label {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.status-light {
+  position: relative;
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #9b9f92;
+}
+
+.status-light::after {
+  position: absolute;
+  inset: -5px;
+  border: 1px solid transparent;
+  border-radius: inherit;
+  content: "";
+}
+
+.status-text {
+  margin: 0;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.status-card[data-state="connected"] .status-light {
+  background: var(--signal);
+}
+
+.status-card[data-state="connected"] .status-light::after {
+  border-color: rgba(68, 122, 85, 0.2);
+}
+
+.status-card[data-state="unavailable"] .status-light {
+  background: var(--warning);
+}
+
+.status-card[data-state="unavailable"] .status-light::after {
+  border-color: rgba(163, 70, 55, 0.2);
+}
+
+.status-card[data-state="checking"] .status-light {
+  background: #ad8b45;
+}
+
+.status-detail {
+  min-height: 42px;
+  margin: 13px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.card-rule {
+  height: 1px;
+  margin: 21px 0 16px;
+  border: 0;
+  background: var(--line);
+}
+
+.endpoint {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.endpoint-label {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.endpoint code {
+  padding: 5px 7px;
+  border-radius: 2px;
+  background: var(--paper-deep);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.check-button {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 20px;
+  border: 1px solid #bec9b9;
+  border-radius: 2px;
+  background: var(--signal-soft);
+  color: #315b3e;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+
+.check-button:hover:not(:disabled) {
+  background: #d9e7d9;
+}
+
+.check-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.check-button:focus-visible {
+  outline: 3px solid rgba(68, 122, 85, 0.3);
+  outline-offset: 3px;
+}
+
+.check-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 0 26px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 700px) {
+  .page {
+    width: min(100% - 36px, 480px);
+  }
+
+  .topline {
+    padding-top: 22px;
+  }
+
+  main {
+    grid-template-columns: 1fr;
+    gap: 42px;
+    padding: 72px 0 76px;
+  }
+
+  .notice {
+    margin-top: 32px;
+  }
+
+  .status-card {
+    max-width: 460px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

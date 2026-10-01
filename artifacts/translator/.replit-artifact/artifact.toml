@@ -1,0 +1,32 @@
+kind = "web"
+previewPath = "/"
+title = "JAL Translator V1"
+description = "A small Node.js-served web application with a plain HTML, CSS, and JavaScript homepage, ready for future translation features."
+version = "1.0.0"
+id = "artifacts/translator"
+router = "path"
+
+[[services]]
+name = "web"
+paths = ["/", "/ws"]
+localPort = 21977
+
+[services.development]
+run = "pnpm --filter @workspace/translator run dev"
+
+[services.production.build]
+args = ["pnpm", "--filter", "@workspace/translator", "run", "build"]
+
+[services.production.run]
+args = ["node", "artifacts/translator/server/server.js"]
+
+[services.production.run.env]
+PORT = "21977"
+NODE_ENV = "production"
+
+[services.production.health.startup]
+path = "/status"
+
+[services.env]
+PORT = "21977"
+BASE_PATH = "/"

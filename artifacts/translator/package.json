@@ -1,0 +1,14 @@
+{
+  "name": "@workspace/translator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch server/server.js",
+    "start": "node server/server.js",
+    "build": "node --check server/server.js && node --check client/app.js"
+  },
+  "engines": {
+    "node": ">=20.6"
+  }
+}

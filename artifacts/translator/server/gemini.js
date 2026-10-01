@@ -1,0 +1,1 @@
+// Reserved for a future Gemini integration. V1 does not use AI features.

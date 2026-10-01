@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f4f1e9">
+    <meta name="description" content="JAL Translator V1 service status.">
+    <title>JAL Translator V1</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23447a55'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='sans-serif' font-size='18' fill='white'%3EJ%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="./style.css">
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <div class="page">
+      <header class="topline">
+        <div class="wordmark" aria-label="JAL Translator">
+          <span class="wordmark-mark" aria-hidden="true">J</span>
+          <span>JAL / LANGUAGE SYSTEMS</span>
+        </div>
+        <span class="edition">SERVICE · V1</span>
+      </header>
+
+      <main>
+        <section class="intro" aria-labelledby="page-title">
+          <p class="kicker">A small translator starter</p>
+          <h1 id="page-title">JAL TRANSLATOR V1</h1>
+          <p class="subtitle">A clear first step toward better understanding, with the service connection up front.</p>
+          <div class="notice">
+            <strong>Translation tools are not available yet.</strong>
+            This starter currently confirms that the server is ready. No translation is being performed.
+          </div>
+        </section>
+
+        <section class="status-card" id="status-card" data-state="checking" aria-labelledby="status-heading">
+          <p class="card-label" id="status-heading">Service status</p>
+          <div class="status-row">
+            <span class="status-light" aria-hidden="true"></span>
+            <p class="status-text" id="status-text" role="status" aria-live="polite">Checking server…</p>
+          </div>
+          <p class="status-detail" id="status-detail">Checking whether the server is reachable.</p>
+          <hr class="card-rule">
+          <div class="endpoint">
+            <span class="endpoint-label">Health check</span>
+            <code>GET /status</code>
+          </div>
+          <button class="check-button" id="check-button" type="button">Check connection</button>
+        </section>
+      </main>
+
+      <footer>
+        <span>JAL TRANSLATOR</span>
+        <span id="checked-at">STATUS · WAITING</span>
+      </footer>
+    </div>
+  </body>
+</html>

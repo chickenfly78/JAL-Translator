@@ -1,0 +1,97 @@
+import { createServer } from "node:http";
+import { readFile } from "node:fs/promises";
+import { extname, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const clientDirectory = resolve(
+  fileURLToPath(new URL("../client/", import.meta.url)),
+);
+const port = Number(process.env.PORT || 3000);
+
+if (!Number.isInteger(port) || port < 1 || port > 65535) {
+  throw new Error(`Invalid PORT value: ${process.env.PORT}`);
+}
+
+const contentTypes = {
+  ".css": "text/css; charset=utf-8",
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+};
+
+function send(response, statusCode, body, contentType = "text/plain; charset=utf-8") {
+  response.writeHead(statusCode, {
+    "Cache-Control": "no-store",
+    "Content-Type": contentType,
+    "X-Content-Type-Options": "nosniff",
+  });
+  response.end(body);
+}
+
+async function handleRequest(request, response) {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    send(response, 405, "Method not allowed");
+    return;
+  }
+
+  let pathname;
+  try {
+    pathname = decodeURIComponent(
+      new URL(request.url || "/", "http://localhost").pathname,
+    );
+  } catch {
+    send(response, 400, "Bad request");
+    return;
+  }
+
+  if (pathname === "/status") {
+    send(
+      response,
+      200,
+      request.method === "HEAD" ? "" : JSON.stringify({ status: "connected" }),
+      "application/json; charset=utf-8",
+    );
+    return;
+  }
+
+  const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
+  const filePath = resolve(clientDirectory, relativePath);
+
+  if (filePath !== clientDirectory && !filePath.startsWith(`${clientDirectory}${sep}`)) {
+    send(response, 403, "Forbidden");
+    return;
+  }
+
+  try {
+    const file = await readFile(filePath);
+    const contentType =
+      contentTypes[extname(filePath)] || "application/octet-stream";
+
+    response.writeHead(200, {
+      "Cache-Control": "no-store",
+      "Content-Type": contentType,
+      "X-Content-Type-Options": "nosniff",
+    });
+    response.end(request.method === "HEAD" ? undefined : file);
+  } catch (error) {
+    if (error.code === "ENOENT" || error.code === "EISDIR") {
+      send(response, 404, "Not found");
+      return;
+    }
+
+    process.stderr.write(`Unable to serve request: ${error.message}\n`);
+    send(response, 500, "Internal server error");
+  }
+}
+
+const server = createServer(handleRequest);
+
+// A WebSocket server can be attached to this HTTP server in a later version.
+server.listen(port, "0.0.0.0", () => {
+  process.stdout.write(`Translator server listening on port ${port}\n`);
+});
+
+server.on("error", (error) => {
+  process.stderr.write(`Translator server error: ${error.message}\n`);
+  process.exitCode = 1;
+});
