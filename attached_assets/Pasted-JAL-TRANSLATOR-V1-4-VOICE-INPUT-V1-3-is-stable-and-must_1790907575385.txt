@@ -1,0 +1,230 @@
+JAL TRANSLATOR V1.4 – VOICE INPUT
+
+V1.3 is stable and must be treated as the baseline.
+
+DO NOT rewrite V1.3.
+
+The following functionality is already working and must remain unchanged:
+
+* WebSocket connection and reconnect
+* Text message sending
+* Immediate original-message display
+* Asynchronous translation
+* Gemini translation
+* Automatic Vietnamese/Japanese language detection
+* Translating... state
+* Translation success/error states
+* Per-message retry
+* Concurrent translations
+* Duplicate protection
+* Desktop/mobile UI
+
+GOAL
+
+Add the first voice-input layer:
+
+MICROPHONE → SPEECH-TO-TEXT → EXISTING MESSAGE PIPELINE
+
+The voice feature must eventually feed the same message pipeline that normal text input already uses.
+
+Do NOT create a second translation system.
+
+Do NOT create a second WebSocket system.
+
+Do NOT send audio directly to Gemini.
+
+V1.4 SCOPE
+
+V1.4 should initially support microphone input from the browser.
+
+The user should be able to:
+
+1. Click a microphone button.
+2. Grant microphone permission.
+3. Speak.
+4. See the recognized speech as text.
+5. Stop recording.
+6. Submit the recognized text through the EXISTING message-sending pipeline.
+7. Let the existing V1.3 translation flow handle the translation.
+
+The existing text input and Send button must continue working exactly as before.
+
+IMPORTANT ARCHITECTURE
+
+Create a voice-input layer conceptually like:
+
+Microphone
+↓
+Speech Recognition
+↓
+recognized text
+↓
+existing sendMessage()
+↓
+existing WebSocket
+↓
+existing translation flow
+
+If the existing client does not have a clean reusable sendMessage() function, refactor only the minimum amount necessary to make both text input and voice input use the same sending function.
+
+Do not duplicate the WebSocket send logic.
+
+LANGUAGE
+
+The application supports Vietnamese ↔ Japanese.
+
+The speech recognition language should be configurable rather than permanently hard-coded.
+
+Provide a simple language selector:
+
+* Auto
+* Vietnamese
+* Japanese
+
+For V1.4:
+
+* Vietnamese → use Vietnamese speech recognition.
+* Japanese → use Japanese speech recognition.
+* Auto → use the best browser-supported behavior available.
+
+IMPORTANT:
+
+Do not claim that browser speech recognition can reliably auto-detect Vietnamese and Japanese if the selected browser API cannot actually do that.
+
+If true automatic speech-language detection is not supported by the browser API, keep Auto as a UI option but clearly indicate the limitation.
+
+UI
+
+Add a microphone button near the existing message input.
+
+Example:
+
+[ 🎤 ] [ Type message…                         ] [ Send ]
+
+When recording:
+
+[ ⏹ Stop ] [ Listening… ]
+
+Show a small status such as:
+
+* Microphone ready
+* Listening…
+* Speech recognized
+* Microphone permission denied
+* Speech recognition unavailable
+
+Keep the existing V1.3 visual design.
+
+Do not redesign the application.
+
+LIVE TRANSCRIPT
+
+While speaking, if the browser API supports interim results:
+
+show them in the input area as temporary text.
+
+Example:
+
+User speaks:
+“Xin chào…”
+
+Input:
+
+Xin chào…
+
+After recognition completes, the final text should remain in the input field.
+
+Do NOT automatically send every interim speech result.
+
+Only send the final recognized message once.
+
+ERROR HANDLING
+
+Handle:
+
+* microphone permission denied
+* browser does not support speech recognition
+* speech recognition error
+* no speech detected
+* microphone stopped
+* recognition timeout
+
+Do not create a message card when there is no final recognized text.
+
+Do not send empty messages.
+
+DUPLICATE PROTECTION
+
+A single spoken sentence must result in at most ONE submitted message.
+
+Interim speech results must never be submitted as separate messages.
+
+Do not modify the existing server duplicate protection unless absolutely necessary.
+
+BROWSER SUPPORT
+
+Before implementing, inspect the target browser environment supported by this Replit project.
+
+Prefer the browser’s native Speech Recognition API if appropriate.
+
+Do not add a large third-party speech library unless there is a clear technical requirement.
+
+If browser support is limited, implement graceful fallback behavior instead of pretending all browsers support it.
+
+SERVER
+
+Prefer ZERO server changes for V1.4.
+
+The server should continue receiving ordinary text messages exactly as it did in V1.3.
+
+Only modify the server if a demonstrated requirement makes it necessary.
+
+TESTING
+
+Test:
+
+1. Normal text input still works.
+2. Microphone button appears.
+3. Permission request works.
+4. Vietnamese speech produces Vietnamese text.
+5. Japanese speech produces Japanese text.
+6. Recognized text can be edited before sending.
+7. One speech input creates one message.
+8. Interim results are not submitted.
+9. Empty speech is ignored.
+10. Permission denial is handled.
+11. Unsupported browser is handled.
+12. Existing translation still works after voice submission.
+13. Existing retry still works.
+14. Existing concurrent translation still works.
+15. WebSocket behavior is unchanged.
+
+VERSIONING
+
+Update the project version to:
+
+JAL TRANSLATOR V1.4
+
+Do not start Zoom/System Audio integration yet.
+
+Do not implement automatic computer/system-audio capture yet.
+
+Do not implement TTS yet.
+
+Do not implement meeting overlay yet.
+
+V1.4 is ONLY:
+
+MICROPHONE → SPEECH-TO-TEXT → EXISTING TRANSLATOR PIPELINE
+
+After implementation, report:
+
+1. Files changed.
+2. Architecture used.
+3. Browser/API used for speech recognition.
+4. Whether server changes were required.
+5. Tests performed.
+6. Browser compatibility limitations.
+7. Confirmation that all V1.3 functionality remains intact.
+
+Stop after V1.4 voice input is complete.

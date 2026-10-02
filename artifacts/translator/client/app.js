@@ -1,3 +1,8 @@
+import {
+  createSpeechInput,
+  resolveSpeechRecognitionLanguage,
+} from "./speech-input.js";
+
 const statusCard = document.querySelector("#status-card");
 const statusText = document.querySelector("#status-text");
 const statusDetail = document.querySelector("#status-detail");
@@ -7,6 +12,9 @@ const messageForm = document.querySelector("#message-form");
 const messageInput = document.querySelector("#message-input");
 const sendButton = document.querySelector("#send-button");
 const messageError = document.querySelector("#message-error");
+const microphoneButton = document.querySelector("#microphone-button");
+const voiceLanguageSelect = document.querySelector("#voice-language");
+const voiceStatus = document.querySelector("#voice-status");
 
 const languages = {
   vi: { flag: "🇻🇳", name: "Vietnamese", code: "VI" },
@@ -16,13 +24,25 @@ const languages = {
 let socket = null;
 let reconnectTimer = null;
 let reconnectAttempt = 0;
+let speechInput = null;
+let voiceDraft = "";
 const messagesById = new Map();
 const messagesByRequestId = new Map();
 
 function updateComposerState() {
   const connected = socket?.readyState === WebSocket.OPEN;
-  messageInput.disabled = !connected;
-  sendButton.disabled = !connected;
+  const listening = speechInput?.isListening === true;
+  messageInput.disabled = !connected || listening;
+  sendButton.disabled = !connected || listening;
+  microphoneButton.disabled =
+    !speechInput?.isSupported || (!connected && !listening);
+  microphoneButton.textContent = listening ? "Stop" : "🎤";
+  microphoneButton.setAttribute(
+    "aria-label",
+    listening ? "Stop recording" : "Start voice input",
+  );
+  microphoneButton.dataset.listening = String(listening);
+  voiceLanguageSelect.disabled = listening;
 
   for (const record of new Set([
     ...messagesById.values(),
@@ -49,6 +69,45 @@ function showMessageError(message) {
 function clearMessageError() {
   messageError.textContent = "";
   messageError.hidden = true;
+}
+
+const voiceStatusMessages = {
+  ready: "Microphone ready",
+  requesting: "Requesting microphone permission…",
+  listening: "Listening…",
+  stopping: "Stopping microphone…",
+  recognized: "Speech recognized. Review or edit it before sending.",
+  "permission-denied":
+    "Microphone permission denied. Allow access in your browser settings.",
+  "microphone-unavailable":
+    "Microphone unavailable. Check your device and browser permissions.",
+  "connection-unavailable": "Connect to use voice input.",
+  "secure-context-required":
+    "Voice input requires a secure browser connection.",
+  "no-speech": "No speech detected. No message was sent.",
+  stopped: "Microphone stopped. No message was sent.",
+  timeout: "Speech recognition timed out. Try again.",
+  error: "Speech recognition error. Please try again.",
+  unavailable: "Speech recognition unavailable in this browser.",
+};
+
+function updateVoiceStatus(state) {
+  voiceStatus.dataset.state = state;
+  voiceStatus.textContent =
+    voiceStatusMessages[state] || voiceStatusMessages.error;
+  updateComposerState();
+}
+
+function updateVoiceTranscript({ finalText, interimText }) {
+  const transcript = [finalText, interimText]
+    .filter((part) => typeof part === "string" && part.trim())
+    .join(" ")
+    .trim();
+  const draft = voiceDraft.trimEnd();
+  messageInput.value =
+    draft && transcript
+      ? `${draft} ${transcript}`
+      : draft || transcript;
 }
 
 function isNearNewestMessage() {
@@ -418,12 +477,19 @@ function connectWebSocket() {
   });
 }
 
-messageForm.addEventListener("submit", (event) => {
-  event.preventDefault();
+function sendMessage(messageText) {
+  if (speechInput?.isListening) return false;
 
-  const text = messageInput.value.trim();
-  if (!text || socket?.readyState !== WebSocket.OPEN) {
-    return;
+  const text = String(messageText || "").trim();
+  if (!text || socket?.readyState !== WebSocket.OPEN) return false;
+
+  const maxLength =
+    Number(messageInput.maxLength) > 0 ? Number(messageInput.maxLength) : 1000;
+  if (text.length > maxLength) {
+    showMessageError(
+      `Messages must be ${maxLength} characters or fewer.`,
+    );
+    return false;
   }
 
   const requestId =
@@ -435,11 +501,59 @@ messageForm.addEventListener("submit", (event) => {
   try {
     socket.send(JSON.stringify({ type: "message", requestId, text }));
     messageInput.value = "";
+    voiceDraft = "";
+    if (voiceStatus.dataset.state === "recognized") {
+      updateVoiceStatus("ready");
+    }
+    return true;
   } catch {
     removeMessageRecord(record);
     showMessageError("Your message could not be sent. Please try again.");
     socket.close();
+    return false;
   }
+}
+
+messageForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  sendMessage(messageInput.value);
+});
+
+const speechRecognitionConstructor =
+  window.SpeechRecognition || window.webkitSpeechRecognition;
+const secureContext = window.isSecureContext !== false;
+speechInput = createSpeechInput({
+  SpeechRecognition: secureContext ? speechRecognitionConstructor : null,
+  getLanguage: () =>
+    resolveSpeechRecognitionLanguage(
+      voiceLanguageSelect.value,
+      window.navigator?.language || "",
+    ),
+  onTranscript: updateVoiceTranscript,
+  onStatus: updateVoiceStatus,
+});
+
+updateVoiceStatus(
+  secureContext
+    ? speechInput.isSupported
+      ? "ready"
+      : "unavailable"
+    : "secure-context-required",
+);
+
+microphoneButton.addEventListener("click", () => {
+  if (speechInput.isListening) {
+    speechInput.stop();
+    return;
+  }
+
+  if (socket?.readyState !== WebSocket.OPEN) {
+    updateVoiceStatus("connection-unavailable");
+    return;
+  }
+
+  voiceDraft = messageInput.value;
+  speechInput.start();
 });
 
 connectWebSocket();

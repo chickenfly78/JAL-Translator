@@ -1,13 +1,13 @@
 {
   "name": "@workspace/translator",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "node --watch server/server.js",
     "start": "node server/server.js",
-    "build": "node --check server/server.js && node --check server/gemini.js && node --check server/translation-errors.js && node --check server/translation-flow.js && node --check client/app.js",
-    "test": "node --test server/*.test.js"
+    "build": "node --check server/server.js && node --check server/gemini.js && node --check server/translation-errors.js && node --check server/translation-flow.js && node --check client/speech-input.js && node --check client/app.js",
+    "test": "node --test server/*.test.js client/*.test.js"
   },
   "engines": {
     "node": ">=20.6"
