@@ -1,0 +1,155 @@
+JAL TRANSLATOR V1.4 – FIX MICROPHONE SEND PIPELINE
+
+The microphone is working correctly:
+
+* Browser microphone permission works.
+* Speech recognition works.
+* Spoken Japanese/Vietnamese is converted into text.
+* The recognized text appears in the input field.
+
+However, when the user presses SEND after using microphone input, the message displays:
+
+“Translation temporarily unavailable”
+
+IMPORTANT:
+The normal manually typed text → Send → Translation pipeline worked correctly in V1.3.
+
+Therefore, DO NOT modify Gemini, translation-flow, WebSocket architecture, or server translation logic unless the investigation proves that the microphone request is actually different at the server.
+
+PRIMARY OBJECTIVE
+
+Make microphone-generated text use EXACTLY the same client sending pipeline as manually typed text.
+
+The desired flow is:
+
+MICROPHONE
+↓
+Speech-to-Text
+↓
+existing message input value
+↓
+EXISTING SEND HANDLER
+↓
+EXISTING send-message WebSocket event
+↓
+existing server translation flow
+↓
+Gemini
+↓
+existing translation event
+↓
+existing message card
+
+There must NOT be a separate “send voice message” pipeline.
+
+INVESTIGATION
+
+Compare these two flows:
+
+A. Manually type:
+
+“Xin chào”
+
+then press Send.
+
+B. Speak:
+
+“Xin chào”
+
+then press Send.
+
+Check whether both produce exactly the same:
+
+* input value
+* trimming behavior
+* message payload
+* message type
+* WebSocket event
+* message ID handling
+* language/direction metadata
+
+IMPORTANT
+
+The microphone feature should ONLY populate the existing message input.
+
+For example:
+
+recognizedSpeechText → messageInput.value
+
+Then the existing Send button/event handler must handle the message normally.
+
+Do NOT call Gemini directly from the microphone code.
+
+Do NOT create a separate WebSocket send function for voice.
+
+Do NOT create a separate translation request for voice.
+
+CHECK FOR COMMON PROBLEMS
+
+Inspect whether the microphone code:
+
+* sends before recognition has finalized
+* sends an interim result instead of final text
+* uses a different payload structure
+* creates a different message type
+* generates an invalid message ID
+* sends undefined/null language information
+* bypasses the existing send handler
+* clears the input before the existing handler reads it
+* sends an empty string after trimming
+* creates duplicate requests
+
+TEST
+
+Perform these exact tests:
+
+1. Type “Xin chào” manually → Send.
+2. Speak “Xin chào” → Stop → verify text appears in input → Send.
+3. Type Japanese “こんにちは” → Send.
+4. Speak Japanese “こんにちは” → Stop → Send.
+5. Compare the server logs/payloads for typed vs microphone messages.
+
+The microphone-generated message should be indistinguishable from manually typed text once it reaches the existing Send handler.
+
+ERROR HANDLING
+
+Do not change:
+
+“Translation temporarily unavailable”
+
+into a success state artificially.
+
+Fix the underlying pipeline.
+
+If the voice-generated request reaches the server exactly like a typed request and Gemini succeeds, then investigate the client-side message ID/event matching.
+
+If the server receives a different payload, fix the client payload.
+
+If both payloads are identical but only voice requests fail, then continue tracing the server.
+
+REGRESSION TEST
+
+After fixing:
+
+* Manual text translation must still work.
+* Microphone text translation must work.
+* Vietnamese → Japanese must work.
+* Japanese → Vietnamese must work.
+* Retry must work.
+* No duplicate cards.
+* Concurrent translations must still work.
+* WebSocket reconnect must still work.
+
+Do not redesign anything.
+
+FINAL REPORT
+
+Report:
+
+1. Root cause.
+2. Exact file changed.
+3. Why microphone messages failed while typed messages worked.
+4. Whether server code needed modification.
+5. Test results.
+
+Do not proceed to Zoom/System Audio.

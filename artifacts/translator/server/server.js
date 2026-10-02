@@ -137,10 +137,23 @@ function broadcast(message) {
 const translationFlow = createTranslationFlow({
   translate: translateText,
   broadcast,
-  onFailure({ unsupported }) {
-    if (!unsupported) {
-      process.stderr.write("Gemini translation request failed.\n");
-    }
+  onFailure({ error, unsupported }) {
+    if (unsupported) return;
+
+    const status = Number(error?.status ?? error?.statusCode);
+    const name = /^[A-Za-z][A-Za-z0-9]{0,63}$/.test(String(error?.name || ""))
+      ? error.name
+      : "Error";
+    const code = /^[A-Za-z0-9_.-]{1,64}$/.test(String(error?.code || ""))
+      ? `, code=${error.code}`
+      : "";
+    const statusDetail =
+      Number.isInteger(status) && status >= 100 && status <= 599
+        ? `, status=${status}`
+        : "";
+    process.stderr.write(
+      `Gemini translation request failed (${name}${statusDetail}${code}).\n`,
+    );
   },
 });
 

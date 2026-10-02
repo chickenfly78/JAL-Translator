@@ -288,6 +288,58 @@ test("voice transcript is editable and sends once through the existing text WebS
   assert.equal(sent.at(-1).text, "こんにちは。");
 });
 
+test("typed and microphone text produce the same trimmed message payload shape", async () => {
+  const { elements, sent, FakeSpeechRecognition } = await createClientHarness();
+  const input = elements.get("#message-input");
+  const form = elements.get("#message-form");
+  const microphone = elements.get("#microphone-button");
+  const messageList = elements.get("#message-list");
+
+  await waitFor(() => !input.disabled, "WebSocket connection");
+  input.value = "  Xin chào  ";
+  form.emit("submit", { preventDefault() {} });
+
+  microphone.click();
+  const recognition = FakeSpeechRecognition.instances[0];
+  recognition.onresult({
+    results: [speechResult("  Xin chào  ", true)],
+  });
+  recognition.onend();
+  assert.equal(input.value, "Xin chào");
+  form.emit("submit", { preventDefault() {} });
+
+  const messages = sent.filter((payload) => payload.type === "message");
+  assert.equal(messages.length, 2);
+  assert.deepEqual(
+    messages.map(({ type, text }) => ({ type, text })),
+    [
+      { type: "message", text: "Xin chào" },
+      { type: "message", text: "Xin chào" },
+    ],
+  );
+  assert.deepEqual(
+    messages.map((payload) => Object.keys(payload).sort()),
+    [
+      ["requestId", "text", "type"],
+      ["requestId", "text", "type"],
+    ],
+  );
+  assert.ok(messages.every((payload) => typeof payload.requestId === "string"));
+  assert.notEqual(messages[0].requestId, messages[1].requestId);
+
+  await waitFor(
+    () =>
+      messageList.children.filter((child) => child.className === "message-entry")
+        .length === 2,
+    "both server message events",
+  );
+  assert.equal(
+    messageList.children.filter((child) => child.className === "message-entry")
+      .length,
+    2,
+  );
+});
+
 test("permission denial and unsupported browsers are visible without creating messages", async () => {
   const supported = await createClientHarness();
   await waitFor(
