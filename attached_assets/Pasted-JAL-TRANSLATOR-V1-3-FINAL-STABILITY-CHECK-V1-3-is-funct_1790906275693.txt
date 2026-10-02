@@ -1,0 +1,75 @@
+JAL TRANSLATOR V1.3 – FINAL STABILITY CHECK
+
+V1.3 is functionally complete and currently working.
+
+Before starting V1.4, perform one focused stability investigation.
+
+IMPORTANT:
+Do NOT redesign the application.
+Do NOT add new features.
+Do NOT change the UI.
+Do NOT change the Gemini model or translation architecture.
+Do NOT change WebSocket behavior unless the investigation proves it is necessary.
+
+There is one remaining item from the V1.3 verification:
+
+“One Gemini test request produced a server-side failure log. A later long-message translation succeeded, and the temporary-failure/retry path passed its tests.”
+
+Please investigate this specific server-side Gemini failure.
+
+Tasks
+
+1. Identify exactly which test/request produced the failure log.
+2. Determine whether it was:
+    * a real application error,
+    * an expected temporary Gemini/API failure,
+    * a test-only condition,
+    * timeout,
+    * rate limit,
+    * malformed request,
+    * response parsing issue,
+    * or another cause.
+3. Check whether the error was correctly classified by the existing translation-error handling.
+4. Check whether the retry mechanism handled it correctly.
+5. Confirm that no successful translation is incorrectly reported as an error.
+6. Confirm that no duplicate translation request is generated.
+7. Confirm that the failure does not leave a message permanently stuck in Translating....
+
+Fix policy
+
+If the investigation finds a genuine bug:
+
+* Make the smallest possible fix.
+* Do not change unrelated code.
+* Add or update a focused regression test.
+* Run the complete existing test suite afterward.
+
+If the failure is an expected/temporary Gemini condition and the application handles it correctly:
+
+* Do NOT change the implementation.
+* Document why the log occurred and why it is safe.
+
+Final verification
+
+Run:
+
+* all existing server tests
+* Vietnamese → Japanese
+* Japanese → Vietnamese
+* concurrent translations
+* temporary Gemini failure + retry
+* long message
+* reconnect
+* empty message
+* oversized message
+* duplicate-message protection
+
+Then report:
+
+1. Root cause of the Gemini failure log.
+2. Whether code was changed.
+3. Files changed, if any.
+4. Test results.
+5. Whether V1.3 is now stable enough to begin V1.4.
+
+Do not start V1.4 yet.
