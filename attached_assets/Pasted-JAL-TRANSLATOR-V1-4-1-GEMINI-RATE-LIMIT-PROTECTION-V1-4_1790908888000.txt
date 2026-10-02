@@ -1,0 +1,372 @@
+JAL TRANSLATOR V1.4.1 – GEMINI RATE LIMIT PROTECTION
+
+V1.4 voice input is working correctly.
+
+Current behavior:
+
+* Microphone works.
+* Speech-to-text works.
+* Recognized text uses the same sendMessage() pipeline as typed text.
+* WebSocket works.
+* Vietnamese ↔ Japanese translation works when Gemini accepts the request.
+* The current remaining problem is Gemini HTTP 429 rate limiting.
+
+GOAL:
+
+Make the translation service resilient to Gemini rate limits without changing the existing application architecture.
+
+This is a focused reliability update.
+
+==================================================
+IMPORTANT – DO NOT BREAK EXISTING FUNCTIONALITY
+
+Do NOT redesign the application.
+
+Do NOT change:
+
+* microphone / speech recognition
+* text input
+* LIVE MESSAGES UI
+* WebSocket architecture
+* message protocol
+* message IDs
+* language detection
+* Gemini model unless investigation proves the configured model is invalid
+* successful translation behavior
+* per-message retry UI
+* duplicate protection
+
+Do NOT start Zoom/System Audio integration.
+
+Do NOT add TTS.
+
+Do NOT add a database.
+
+Do NOT add persistent queue storage.
+
+Keep the implementation as small and reliable as possible.
+
+==================================================
+STEP 1 – INVESTIGATE THE CURRENT GEMINI 429
+
+Before changing code, inspect the current Gemini request implementation.
+
+Determine:
+
+1. Which Gemini model is currently configured.
+2. Which API endpoint/method is being used.
+3. Whether the application already retries temporary errors.
+4. Which HTTP statuses are currently considered retryable.
+5. Whether 429 is already classified as retryable.
+6. Whether Gemini returns:
+    * Retry-After
+    * retry delay metadata
+    * quota information
+    * structured error code
+    * structured error message
+7. Whether multiple translation requests can run concurrently.
+8. Whether the current internal retry logic can multiply requests during a rate-limit event.
+
+Do not assume the cause of 429.
+
+Record the actual evidence.
+
+==================================================
+STEP 2 – CORRECT 429 CLASSIFICATION
+
+HTTP 429 must be treated as a rate-limit condition.
+
+Do NOT immediately display:
+
+“Translation temporarily unavailable”
+
+if the request can safely be retried.
+
+The system should distinguish:
+
+* successful translation
+* retryable temporary failure
+* rate-limit failure
+* permanent translation failure
+
+Keep the existing client error UI unless a small status improvement is useful.
+
+Do not expose raw Gemini API errors or secrets to the user.
+
+==================================================
+STEP 3 – RETRY WITH EXPONENTIAL BACKOFF
+
+Implement controlled retry behavior for HTTP 429.
+
+Use exponential backoff with jitter.
+
+Conceptually:
+
+attempt 1
+↓
+wait
+↓
+attempt 2
+↓
+wait longer
+↓
+attempt 3
+
+Do NOT retry immediately in a tight loop.
+
+Use a bounded retry count.
+
+The exact delay should preferably respect Gemini’s Retry-After or retry-delay information when safely available.
+
+If no provider retry delay is available, use a reasonable exponential backoff with jitter.
+
+Example strategy:
+
+base delay:
+1 second
+
+then approximately:
+
+1s
+2s
+4s
+
+with small random jitter.
+
+Do not make the user wait excessively.
+
+Set a clear maximum retry delay and maximum retry count.
+
+Do not retry forever.
+
+==================================================
+STEP 4 – PREVENT RETRY STORMS
+
+This is extremely important.
+
+If several messages arrive at the same time and Gemini begins returning 429:
+
+DO NOT allow every message to independently hammer Gemini with immediate retries.
+
+Implement a lightweight concurrency/rate-limit guard.
+
+The preferred approach is:
+
+* limit the number of simultaneous Gemini requests
+* queue additional translation jobs in memory
+* process them safely
+* when Gemini returns 429, slow the queue down
+* avoid sending a burst of retries
+
+Do not add persistent storage.
+
+If a simple concurrency limit is sufficient, prefer it over a complicated queue system.
+
+Start conservatively.
+
+The implementation should support concurrent messages without creating an uncontrolled request burst.
+
+==================================================
+STEP 5 – PRESERVE MESSAGE ORDER
+
+Important:
+
+The application currently supports concurrent translations.
+
+Do not break that behavior.
+
+Messages may still appear immediately in LIVE MESSAGES.
+
+A translation can complete independently.
+
+Do NOT block the entire WebSocket or UI because one translation is rate-limited.
+
+Only the translation job should wait/retry.
+
+==================================================
+STEP 6 – USER RETRY BUTTON
+
+The existing per-message Retry button must continue working.
+
+Important:
+
+If automatic retry is already running for a message:
+
+* pressing Retry must NOT create another simultaneous translation request.
+
+Prevent duplicate retry jobs.
+
+After automatic retries are exhausted:
+
+* the existing error state may remain
+* the user can manually press Retry
+
+A manual Retry should create exactly one new translation attempt.
+
+==================================================
+STEP 7 – ERROR STATES
+
+Keep the original message visible at all times.
+
+Do not lose the original text.
+
+While automatic retry is happening, preferably show a meaningful state such as:
+
+“Rate limited — retrying…”
+
+or
+
+“Retrying translation…”
+
+After retry succeeds:
+
+replace the status with the actual translation.
+
+If all automatic retries fail:
+
+show a clear final state such as:
+
+“Translation temporarily unavailable”
+
+The exact existing UI style should be preserved.
+
+Do not expose technical Gemini error details to normal users.
+
+==================================================
+STEP 8 – LOGGING
+
+Keep the existing sanitized Gemini diagnostic logging.
+
+For a 429, log only safe diagnostic information such as:
+
+* request/message ID
+* HTTP status
+* error classification
+* retry attempt
+* retry delay
+* whether provider retry metadata was available
+
+Do NOT log:
+
+* API keys
+* Authorization headers
+* secrets
+* unnecessary message content
+
+The logs should make it possible to diagnose future rate-limit events.
+
+==================================================
+STEP 9 – TESTS
+
+Add focused tests for:
+
+1. Gemini 429 is detected.
+2. 429 is classified as rate-limit/retryable.
+3. Retry uses backoff.
+4. Retry does not happen in a tight loop.
+5. Retry count is bounded.
+6. Successful retry produces exactly one translation.
+7. Failed retries produce one final error state.
+8. Multiple simultaneous messages do not create a retry storm.
+9. Two messages can still translate independently.
+10. Manual Retry does not duplicate an automatic retry.
+11. Successful non-429 responses are unchanged.
+12. Permanent errors are not endlessly retried.
+13. WebSocket behavior is unchanged.
+14. Message cards are not duplicated.
+15. Microphone-generated messages still use the same pipeline.
+
+Use a mocked Gemini/API response for 429 tests.
+
+Do NOT depend on real Gemini rate limits for automated tests.
+
+==================================================
+STEP 10 – REGRESSION TESTS
+
+Run the complete existing test suite.
+
+Verify:
+
+* Vietnamese → Japanese
+* Japanese → Vietnamese
+* concurrent translations
+* microphone → text → translation
+* typed text → translation
+* retry
+* long message
+* empty message
+* oversized message
+* reconnect
+* duplicate protection
+
+The existing 12 V1.4 tests must continue passing.
+
+==================================================
+IMPLEMENTATION PRINCIPLES
+
+Prefer:
+
+small changes
+simple logic
+clear functions
+bounded retries
+safe concurrency
+in-memory state
+
+Avoid:
+
+complex frameworks
+new external dependencies unless necessary
+persistent queues
+database changes
+UI redesign
+protocol redesign
+
+If an existing retry mechanism already exists, extend it rather than creating a second retry system.
+
+If an existing translation queue/concurrency mechanism exists, improve it rather than creating a parallel one.
+
+==================================================
+IMPORTANT ABOUT GEMINI QUOTA
+
+Do not claim that exponential backoff “solves” Gemini quota limits.
+
+If the account/model has a hard quota or exhausted allowance, retries may continue to fail.
+
+The implementation should handle this gracefully.
+
+If the investigation reveals that the configured Gemini model or account has a specific documented quota limitation, report it separately.
+
+Do not change models automatically.
+
+==================================================
+VERSION
+
+Update the project version to:
+
+JAL TRANSLATOR V1.4.1
+
+Title:
+
+JAL TRANSLATOR V1.4.1 – GEMINI RATE LIMIT PROTECTION
+
+==================================================
+FINAL REPORT
+
+After implementation, report:
+
+1. Root cause/evidence for the current 429.
+2. Current Gemini model and request configuration.
+3. Whether Retry-After or retry-delay metadata is available.
+4. Retry strategy implemented.
+5. Maximum automatic retries.
+6. Concurrency limit/queue strategy.
+7. Files changed.
+8. Tests added.
+9. Full test results.
+10. Confirmation that V1.3/V1.4 behavior remains intact.
+11. Any remaining Gemini quota limitations.
+
+Do NOT start V1.5.
+
+Stop after V1.4.1 rate-limit protection is complete.
