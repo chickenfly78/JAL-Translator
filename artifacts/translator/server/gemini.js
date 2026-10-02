@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
-import { isTemporaryTranslationError } from "./translation-errors.js";
 
 const model = "gemini-3-flash-preview";
+const retryableStatuses = new Set([408, 429, 500, 502, 503, 504]);
 const maxAttempts = 3;
 const systemInstruction = [
   "You translate text between Vietnamese and Japanese.",
@@ -41,7 +41,10 @@ async function requestTranslation(text) {
         },
       });
     } catch (error) {
-      if (attempt === maxAttempts - 1 || !isTemporaryTranslationError(error)) {
+      if (
+        attempt === maxAttempts - 1 ||
+        !retryableStatuses.has(Number(error?.status))
+      ) {
         throw error;
       }
 

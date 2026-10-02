@@ -9,8 +9,8 @@ const sendButton = document.querySelector("#send-button");
 const messageError = document.querySelector("#message-error");
 
 const languages = {
-  vi: { flag: "🇻🇳", name: "Vietnamese" },
-  ja: { flag: "🇯🇵", name: "Japanese" },
+  vi: { flag: "🇻🇳", name: "Vietnamese", code: "VI" },
+  ja: { flag: "🇯🇵", name: "Japanese", code: "JP" },
 };
 
 let socket = null;
@@ -51,8 +51,19 @@ function clearMessageError() {
   messageError.hidden = true;
 }
 
-function scrollMessagesToBottom() {
-  messageList.scrollTop = messageList.scrollHeight;
+function isNearNewestMessage() {
+  return (
+    messageList.scrollHeight -
+      messageList.scrollTop -
+      messageList.clientHeight <=
+    40
+  );
+}
+
+function scrollMessagesToBottomIfFollowing(shouldFollow) {
+  if (shouldFollow) {
+    messageList.scrollTop = messageList.scrollHeight;
+  }
 }
 
 function findMessageRecord(message) {
@@ -69,15 +80,23 @@ function findMessageRecord(message) {
 }
 
 function createMessageRecord({ messageId, requestId, originalText }) {
+  const shouldFollow = isNearNewestMessage();
   emptyState?.remove();
 
   const entry = document.createElement("article");
   entry.className = "message-entry";
 
+  const header = document.createElement("div");
+  header.className = "message-header";
+
   const sender = document.createElement("p");
   sender.className = "message-sender";
   sender.textContent = "Participant";
   sender.setAttribute("aria-label", "Participant");
+
+  const direction = document.createElement("span");
+  direction.className = "message-direction";
+  direction.hidden = true;
 
   const original = document.createElement("p");
   original.className = "message-original";
@@ -109,13 +128,15 @@ function createMessageRecord({ messageId, requestId, originalText }) {
   retryButton.hidden = true;
 
   translated.append(flag, accessibleLabel, translatedText, retryButton);
-  entry.append(sender, original, translated);
+  header.append(sender, direction);
+  entry.append(header, original, translated);
   messageList.append(entry);
 
   const record = {
     messageId,
     requestId,
     entry,
+    direction,
     sender,
     original,
     translation: translated,
@@ -133,7 +154,7 @@ function createMessageRecord({ messageId, requestId, originalText }) {
     retryTranslation(record);
   });
 
-  scrollMessagesToBottom();
+  scrollMessagesToBottomIfFollowing(shouldFollow);
   return record;
 }
 
@@ -172,6 +193,7 @@ function upsertMessage(message) {
 }
 
 function showTranslating(record) {
+  const shouldFollow = isNearNewestMessage();
   record.status = "translating";
   record.translation.dataset.state = "translating";
   record.flag.hidden = true;
@@ -179,9 +201,11 @@ function showTranslating(record) {
   record.translatedText.textContent = "Translating...";
   record.retryButton.hidden = true;
   record.retryButton.disabled = true;
+  scrollMessagesToBottomIfFollowing(shouldFollow);
 }
 
 function showTranslation(record, message) {
+  const shouldFollow = isNearNewestMessage();
   const source = languages[message.sourceLanguage];
   const target = languages[message.targetLanguage];
   if (
@@ -200,6 +224,8 @@ function showTranslation(record, message) {
   record.status = "translated";
   record.sender.textContent = `${source.flag} Participant`;
   record.sender.setAttribute("aria-label", `${source.name} participant`);
+  record.direction.textContent = `${source.code} → ${target.code}`;
+  record.direction.hidden = false;
   record.original.lang = message.sourceLanguage;
   record.translation.lang = message.targetLanguage;
   record.translation.dataset.state = "translated";
@@ -209,10 +235,11 @@ function showTranslation(record, message) {
   record.translatedText.textContent = message.translatedText;
   record.retryButton.hidden = true;
   record.retryButton.disabled = true;
-  scrollMessagesToBottom();
+  scrollMessagesToBottomIfFollowing(shouldFollow);
 }
 
 function showTranslationFailure(record, message) {
+  const shouldFollow = isNearNewestMessage();
   record.status = message.retryable ? "unavailable" : "failed";
   record.translation.dataset.state = message.retryable ? "unavailable" : "error";
   record.flag.hidden = true;
@@ -221,7 +248,7 @@ function showTranslationFailure(record, message) {
   record.retryButton.hidden = !message.retryable;
   record.retryButton.disabled =
     !message.retryable || socket?.readyState !== WebSocket.OPEN;
-  scrollMessagesToBottom();
+  scrollMessagesToBottomIfFollowing(shouldFollow);
 }
 
 function retryTranslation(record) {

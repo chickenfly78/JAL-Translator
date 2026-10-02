@@ -1,0 +1,206 @@
+You are continuing the existing JAL Translator project.
+
+IMPORTANT:
+The current V1.2 is already working correctly. Do NOT rebuild the project and do NOT replace working functionality.
+
+Current V1.2 working features:
+
+* WebSocket connection works.
+* Messages appear immediately after sending.
+* Translation runs asynchronously.
+* Translating... is shown while waiting.
+* Gemini API translation works.
+* Temporary Gemini errors have retry handling.
+* Vietnamese ↔ Japanese translation works.
+* Auto language detection works.
+
+GOAL: V1.3 – Improve the LIVE MESSAGES UI
+
+First, inspect the existing project and understand the current client/server structure.
+
+STRICT RULES
+
+1. DO NOT change the Gemini API implementation.
+2. DO NOT change the WebSocket protocol unless absolutely necessary.
+3. DO NOT rewrite the server.
+4. DO NOT change environment variables or secrets.
+5. DO NOT change the existing translation logic.
+6. DO NOT remove retry handling.
+7. DO NOT remove auto language detection.
+8. DO NOT break the current working V1.2 behavior.
+9. Make the smallest possible changes.
+10. Before modifying anything, inspect the existing code and identify which files are responsible for the current LIVE MESSAGES UI.
+
+V1.3 UI REQUIREMENTS
+
+Improve the message display so that each message has a clear conversation-card structure.
+
+Example:
+
+┌──────────────────────────────────────┐
+│ Participant                           │
+│                                       │
+│ こんにちは、元気ですか？                 │
+│                                       │
+│ ─────────────────────────────────── │
+│ Xin chào, bạn khỏe không?              │
+└──────────────────────────────────────┘
+
+Each message should contain:
+
+* Participant/speaker name
+* Original message
+* Translation
+* Translation status
+
+Translation states
+
+Before translation:
+
+Original message
+Translating...
+
+After successful translation:
+
+Original message
+Translation
+
+If translation temporarily fails:
+
+Original message
+Translation temporarily unavailable
+
+Do not remove the original message when translation fails.
+
+LANGUAGE INDICATOR
+
+Show the detected language clearly.
+
+For example:
+
+JP → VI
+
+or
+
+VI → JP
+
+Do not hard-code the direction. Use the actual detected language from the existing translation result if that information already exists.
+
+If the existing backend does not provide language information, do NOT modify the backend just for this. Keep V1.3 focused on UI.
+
+MESSAGE BEHAVIOR
+
+New messages must:
+
+* Appear immediately.
+* Keep the original text visible while translation is running.
+* Update only the translation area when translation completes.
+* Never duplicate the same message.
+* Never reorder existing messages.
+* Automatically scroll to the newest message when appropriate.
+* Avoid forcing the user to scroll down if they are currently reading older messages.
+
+VISUAL DESIGN
+
+Keep the design simple and professional.
+
+The application is intended for use during real meetings, so:
+
+* High readability
+* Large enough text
+* Clear separation between original and translation
+* Minimal decoration
+* No unnecessary animations
+* No excessive colors
+* No distracting effects
+
+Use the existing visual style where possible rather than redesigning the entire application.
+
+CONNECTION STATUS
+
+Keep the existing connection status UI.
+
+Do not change the WebSocket connection logic.
+
+If the current UI already shows:
+
+* Connected
+* Connecting
+* Disconnected
+* Error
+
+keep those states working exactly as they currently do.
+
+SEND MESSAGE
+
+Keep the existing message input and Send button behavior.
+
+Do not change the existing sending logic unless necessary for the UI changes.
+
+The Enter key behavior must continue to work if it already works.
+
+RESPONSIVE DESIGN
+
+The LIVE MESSAGES area should work well on:
+
+* Desktop
+* Laptop
+* Tablet
+* Mobile
+
+Do not introduce horizontal scrolling.
+
+CODE QUALITY
+
+Before editing:
+
+1. Inspect the current client code.
+2. Identify the existing message rendering function.
+3. Identify how translation results update an existing message.
+4. Reuse the existing architecture.
+
+Prefer modifying the existing message-rendering code instead of creating a second parallel message system.
+
+Do not create duplicate event listeners.
+
+Do not create duplicate WebSocket connections.
+
+Do not create duplicate translation requests.
+
+TESTING
+
+After implementation, test these cases:
+
+1. Vietnamese → Japanese
+2. Japanese → Vietnamese
+3. Auto language detection
+4. Original message appears immediately
+5. Translating... appears
+6. Translation replaces Translating...
+7. Temporary translation error
+8. Multiple consecutive messages
+9. Long messages
+10. Empty message
+11. WebSocket reconnect
+12. Desktop layout
+13. Mobile layout
+
+VERY IMPORTANT
+
+This is an incremental upgrade from V1.2.
+
+DO NOT say “I rebuilt the application.”
+
+DO NOT replace working code unnecessarily.
+
+After making changes, provide:
+
+1. A short summary of what files were changed.
+2. What was changed in each file.
+3. How the existing V1.2 functionality was preserved.
+4. Any tests performed.
+5. Any issues that remain.
+
+If everything works, label the result:
+
+JAL TRANSLATOR V1.3 – UI UPDATE

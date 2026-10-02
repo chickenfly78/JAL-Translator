@@ -265,14 +265,15 @@ h1 {
   min-height: 116px;
   max-height: 260px;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
+  align-items: stretch;
+  gap: 10px;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 14px;
   border: 1px solid var(--line);
   background: rgba(244, 241, 233, 0.58);
   overscroll-behavior: contain;
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
 }
 
 .empty-state {
@@ -284,26 +285,52 @@ h1 {
 }
 
 .message-entry {
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
-  animation: arrive 220ms ease-out both;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: rgba(250, 249, 243, 0.72);
+}
+
+.message-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
 }
 
 .message-sender {
-  margin: 0 0 5px 2px;
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.message-direction {
+  flex: 0 0 auto;
   color: var(--muted);
   font-family: var(--mono);
   font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.message-direction[hidden] {
+  display: none;
 }
 
 .message-original {
   max-width: 100%;
   margin: 0;
-  padding: 9px 12px;
-  border: 1px solid #d9ded2;
-  border-radius: 2px;
-  background: rgba(250, 249, 243, 0.9);
+  padding: 2px 2px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
   color: var(--ink);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
@@ -320,7 +347,7 @@ h1 {
   border-radius: 2px;
   background: var(--signal-soft);
   color: #315b3e;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
 }
 
@@ -432,19 +459,12 @@ h1 {
 
 .message-error {
   margin: 10px 0 0;
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-.message-processing {
-  color: var(--muted);
-}
-
-.message-error {
   padding: 8px 10px;
   border-left: 2px solid var(--warning);
   background: var(--warning-soft);
   color: #84372c;
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .message-help {

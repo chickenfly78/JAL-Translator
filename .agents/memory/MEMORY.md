@@ -1,1 +1,2 @@
 - [Gemini API model availability](gemini-model-availability.md) — verify model access with the user's key; old IDs and temporary overload can affect new accounts.
+- [JAL Translator incremental updates](jal-translator-scope.md) — preserve the existing Gemini and WebSocket behavior; keep changes narrowly scoped and avoid persistent storage.
